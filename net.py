@@ -29,8 +29,18 @@ class TextBoxes():
               'conv4_1': tf.Variable(tf.random_normal([3, 3, 256, 512])),
               'conv4_2': tf.Variable(tf.random_normal([3, 3, 512, 512])),
               'conv4_3': tf.Variable(tf.random_normal([3, 3, 512, 512])),
-              'out': tf.Variable(tf.random_normal([1024, n_classes])) }
-        biases = {'conv1_1': tf.Variable(tf.random_normal([64])),
+              'conv5_1': tf.Variable(tf.random_normal([3, 3, 512, 512])),
+              'conv5_2': tf.Variable(tf.random_normal([3, 3, 512, 512])),
+              'conv5_3': tf.Variable(tf.random_normal([3, 3, 512, 512])),
+              'fc6': tf.Variable(tf.random_normal([3, 3, 512, 1024])),
+              'fc7': tf.Variable(tf.random_normal([1, 1, 1024, 1024])),
+              'conv6_1': tf.Variable(tf.random_normal([1, 1, 1024, 256])),
+              'conv6_2': tf.Variable(tf.random_normal([3, 3, 256, 512])),
+              'conv7_1': tf.Variable(tf.random_normal([1, 1, 512, 128])),
+              'conv7_2': tf.Variable(tf.random_normal([3, 3, 128, 256])),
+        }
+        # Biases
+        B = {'conv1_1': tf.Variable(tf.random_normal([64])),
                   'conv1_2': tf.Variable(tf.random_normal([64])),
                   'conv2_1': tf.Variable(tf.random_normal([128])),
                   'conv2_2': tf.Variable(tf.random_normal([128])),
@@ -40,11 +50,23 @@ class TextBoxes():
                   'conv4_1': tf.Variable(tf.random_normal([512])),
                   'conv4_2': tf.Variable(tf.random_normal([512])),
                   'conv4_3': tf.Variable(tf.random_normal([512])),
-                  'out': tf.Variable(tf.random_normal([1024])),}
+                  'conv5_1': tf.Variable(tf.random_normal([512])),
+                  'conv5_2': tf.Variable(tf.random_normal([512])),
+                  'conv5_3': tf.Variable(tf.random_normal([512])),
+                  'fc6': tf.Variable(tf.random_normal([1024])),
+                  'fc7': tf.Variable(tf.random_normal([1024])),
+                  'conv6_1': tf.Variable(tf.random_normal([256])),
+                  'conv6_2': tf.Variable(tf.random_normal([512])),
+                  'conv7_1': tf.Variable(tf.random_normal([128])),
+                  'conv7_2': tf.Variable(tf.random_normal([256])),
+        }
 
-    def conv2d(self, x, W, b, strides=1):
+    def conv2d(self, x, W, b, strides=1, dilation=1):
         ''' Conv2D wrapper, with bias and relu activation '''
-        x = tf.nn.conv2d(x, W, strides=[1, strides, strides, 1], padding='SAME')
+        if dilation == 1:
+            x = tf.nn.conv2d(x, W, strides=[1, strides, strides, 1], padding='SAME')
+        else:
+            x = tf.nn.atrous_conv2d(x, W, rate=dilation, padding='SAME')
         x = tf.nn.bias_add(x, b)
         return tf.nn.relu(x)
 
@@ -56,23 +78,40 @@ class TextBoxes():
 
     def net(self):
         # VGG16 (conv1_1 to conv4_3)
-        conv1_1 = conv2d(x, W['conv1_1'], biases['conv1_1'])
-        conv1_2 = conv2d(conv1_1, W['conv1_2'], biases['conv1_2'])
+        conv1_1 = conv2d(x, W['conv1_1'], B['conv1_1'])
+        conv1_2 = conv2d(conv1_1, W['conv1_2'], B['conv1_2'])
         conv1 = maxpool2d(conv1_2)
 
-        conv2_1 = conv2d(conv1, W['conv2_1'], biases['conv2_1'])
-        conv2_2 = conv2d(conv2_1, W['conv2_2'], biases['conv2_2'])
+        conv2_1 = conv2d(conv1, W['conv2_1'], B['conv2_1'])
+        conv2_2 = conv2d(conv2_1, W['conv2_2'], B['conv2_2'])
         conv2 = maxpool2d(conv2_2)
 
-        conv3_1 = conv2d(conv2, W['conv3_1'], biases['conv3_1'])
-        conv3_2 = conv2d(conv3_1, W['conv3_2'], biases['conv3_2'])
-        conv3_3 = conv2d(conv3_2, W['conv3_3'], biases['conv3_3'])
+        conv3_1 = conv2d(conv2, W['conv3_1'], B['conv3_1'])
+        conv3_2 = conv2d(conv3_1, W['conv3_2'], B['conv3_2'])
+        conv3_3 = conv2d(conv3_2, W['conv3_3'], B['conv3_3'])
         conv3 = maxpool2d(conv3_3)
 
-        conv4_1 = conv2d(conv3, W['conv4_1'], biases['conv4_1'])
-        conv4_2 = conv2d(conv4_1, W['conv4_2'], biases['conv4_2'])
-        conv4_3 = conv2d(conv4_2, W['conv4_3'], biases['conv4_3'])
+        conv4_1 = conv2d(conv3, W['conv4_1'], B['conv4_1'])
+        conv4_2 = conv2d(conv4_1, W['conv4_2'], B['conv4_2'])
+        conv4_3 = conv2d(conv4_2, W['conv4_3'], B['conv4_3'])
         conv4 = maxpool2d(conv4_3)
 
-    def train(self):
-        pass
+        conv5_1 = conv2d(conv4, W['conv5_1'], B['conv5_1'])
+        conv5_2 = conv2d(conv5_1, W['conv5_2'], B['conv5_2'])
+        conv5_3 = conv2d(conv5_2, W['conv5_3'], B['conv5_3'])
+        conv5 = maxpool2d(conv5_3, k=3)
+
+        fc6 = conv2d(conv5, W['fc6'], B['fc6'], dilation=6)
+        fc7 = conv2d(fc6, W['fc7'], B['fc7'])
+
+        conv6_1 = conv2d(fc7, W['conv6_1'], B['conv6_1'])
+        conv6_2 = conv2d(conv6_1, W['conv6_2'], B['conv6_2'], strides=2)
+
+        conv7_1 = conv2d(conv6_2, W['conv7_1'], B['conv7_1'])
+        conv7_2 = conv2d(conv7_1, W['conv7_2'], B['conv7_2'], strides=2)
+
+    def train(self, train_data):
+        print "Training is done"
+
+    def test(self, test_data):
+        print "accuracy:"
