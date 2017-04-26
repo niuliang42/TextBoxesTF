@@ -38,6 +38,8 @@ class TextBoxes():
               'conv6_2': tf.Variable(tf.random_normal([3, 3, 256, 512])),
               'conv7_1': tf.Variable(tf.random_normal([1, 1, 512, 128])),
               'conv7_2': tf.Variable(tf.random_normal([3, 3, 128, 256])),
+              'conv8_1': tf.Variable(tf.random_normal([1, 1, 256, 128])),
+              'conv8_2': tf.Variable(tf.random_normal([3, 3, 128, 256])),
         }
         # Biases
         B = {'conv1_1': tf.Variable(tf.random_normal([64])),
@@ -59,6 +61,7 @@ class TextBoxes():
                   'conv6_2': tf.Variable(tf.random_normal([512])),
                   'conv7_1': tf.Variable(tf.random_normal([128])),
                   'conv7_2': tf.Variable(tf.random_normal([256])),
+                  'conv8_1': tf.Variable(tf.random_normal([128])),
         }
 
     def conv2d(self, x, W, b, strides=1, dilation=1):
@@ -70,14 +73,18 @@ class TextBoxes():
         x = tf.nn.bias_add(x, b)
         return tf.nn.relu(x)
 
+    def globalavgpool2d(self, x):
+        ''' Global Avg Pool 2D wrapper '''
+        return tf.nn.avg_pool(x, [n_height, n_width], [n_height, n_width])
 
-    def maxpool2d(self, x, k=2):
+    def maxpool2d(self, x, k=2, strides=-1):
         ''' MaxPool2D wrapper '''
-        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1],
-                            padding='SAME')
+        if strides==-1:
+            return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='SAME')
+        else:
+            return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, strides, strides, 1], padding='SAME')
 
     def net(self):
-        # VGG16 (conv1_1 to conv4_3)
         conv1_1 = conv2d(x, W['conv1_1'], B['conv1_1'])
         conv1_2 = conv2d(conv1_1, W['conv1_2'], B['conv1_2'])
         conv1 = maxpool2d(conv1_2)
@@ -99,7 +106,7 @@ class TextBoxes():
         conv5_1 = conv2d(conv4, W['conv5_1'], B['conv5_1'])
         conv5_2 = conv2d(conv5_1, W['conv5_2'], B['conv5_2'])
         conv5_3 = conv2d(conv5_2, W['conv5_3'], B['conv5_3'])
-        conv5 = maxpool2d(conv5_3, k=3)
+        conv5 = maxpool2d(conv5_3, k=3, strides=1)
 
         fc6 = conv2d(conv5, W['fc6'], B['fc6'], dilation=6)
         fc7 = conv2d(fc6, W['fc7'], B['fc7'])
@@ -110,8 +117,12 @@ class TextBoxes():
         conv7_1 = conv2d(conv6_2, W['conv7_1'], B['conv7_1'])
         conv7_2 = conv2d(conv7_1, W['conv7_2'], B['conv7_2'], strides=2)
 
+        conv8_1 = conv2d(conv7_2, W['conv8_1'], B['conv8_1'])
+        conv8_2 = conv2d(conv8_1, W['conv8_2'], B['conv8_2'], strides=2)
+        pool6 = globalavgpool2d(conv8_2)
+
     def train(self, train_data):
-        print "Training is done"
+        print "Training is done."
 
     def test(self, test_data):
-        print "accuracy:"
+        print "Accuracy is NaN"
